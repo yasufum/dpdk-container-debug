@@ -1455,6 +1455,7 @@ secondary_msl_create_walk(const struct rte_memseg_list *msl,
 	struct rte_memseg_list *primary_msl, *local_msl;
 	char name[PATH_MAX];
 	int msl_idx, ret;
+	char proc_id[16];
 
 	if (msl->external)
 		return 0;
@@ -1464,8 +1465,25 @@ secondary_msl_create_walk(const struct rte_memseg_list *msl,
 	local_msl = &local_memsegs[msl_idx];
 
 	/* create distinct fbarrays for each secondary */
-	snprintf(name, RTE_FBARRAY_NAME_LEN, "%s_%i",
-		primary_msl->memseg_arr.name, getpid());
+	if (getpid() == 1) {
+		FILE *hn_fp;
+
+		hn_fp = fopen("/etc/hostname", "r");
+		if (hn_fp == NULL) {
+			RTE_LOG(ERR, EAL, "(yasufum) Cannot open '/etc/hostname'\n");
+			return -1;
+		}
+
+		RTE_LOG(INFO, EAL, "(yasufum) Open '/etc/hostname'\n");
+		if (fscanf(hn_fp, "%s", proc_id) == EOF)
+			return -1;
+		RTE_LOG(INFO, EAL, "(yasufum) Container ID is %s\n", proc_id);
+		fclose(hn_fp);
+	} else
+		sprintf(proc_id, "%d", (int)getpid());
+
+	snprintf(name, RTE_FBARRAY_NAME_LEN, "%s_%s",
+		primary_msl->memseg_arr.name, proc_id);
 
 	ret = rte_fbarray_init(&local_msl->memseg_arr, name,
 		primary_msl->memseg_arr.len,

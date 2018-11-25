@@ -691,20 +691,25 @@ rte_fbarray_init(struct rte_fbarray *arr, const char *name, unsigned int len,
 		rte_errno = EINVAL;
 		return -1;
 	}
+	RTE_LOG(INFO, EAL, "(yasufum) arr is not NULL\n");
 
 	if (fully_validate(name, elt_sz, len))
 		return -1;
+	RTE_LOG(INFO, EAL, "(yasufum) fully_validate is OK\n");
 
 	page_sz = sysconf(_SC_PAGESIZE);
 	if (page_sz == (size_t)-1)
 		goto fail;
+	RTE_LOG(INFO, EAL, "(yasufum) page_sz is %zu\n", page_sz);
 
 	/* calculate our memory limits */
 	mmap_len = calc_data_size(page_sz, elt_sz, len);
+	RTE_LOG(INFO, EAL, "(yasufum) mmap_len is %zu\n", mmap_len);
 
 	data = eal_get_virtual_area(NULL, &mmap_len, page_sz, 0, 0);
 	if (data == NULL)
 		goto fail;
+	RTE_LOG(INFO, EAL, "(yasufum) data is OK\n");
 
 	if (internal_config.no_shconf) {
 		/* remap virtual area as writable */
@@ -725,17 +730,24 @@ rte_fbarray_init(struct rte_fbarray *arr, const char *name, unsigned int len,
 		 * already.
 		 */
 		fd = open(path, O_CREAT | O_RDWR, 0600);
+		RTE_LOG(INFO, EAL, "%s(): open lock %s\n",
+				__func__, path);
 		if (fd < 0) {
 			RTE_LOG(DEBUG, EAL, "%s(): couldn't open %s: %s\n",
+					__func__, path, strerror(errno));
+			RTE_LOG(INFO, EAL, "(yasufum) %s(): couldn't open %s: %s\n",
 					__func__, path, strerror(errno));
 			rte_errno = errno;
 			goto fail;
 		} else if (flock(fd, LOCK_EX | LOCK_NB)) {
 			RTE_LOG(DEBUG, EAL, "%s(): couldn't lock %s: %s\n",
 					__func__, path, strerror(errno));
+			RTE_LOG(INFO, EAL, "(yasufum) %s(): couldn't lock %s: %s\n",
+					__func__, path, strerror(errno));
 			rte_errno = EBUSY;
 			goto fail;
 		}
+		RTE_LOG(INFO, EAL, "(yasufum) fd is OK\n");
 
 		/* take out a non-exclusive lock, so that other processes could
 		 * still attach to it, but no other process could reinitialize
@@ -745,9 +757,11 @@ rte_fbarray_init(struct rte_fbarray *arr, const char *name, unsigned int len,
 			rte_errno = errno;
 			goto fail;
 		}
+		RTE_LOG(INFO, EAL, "(yasufum) fd lock is OK\n");
 
 		if (resize_and_map(fd, data, mmap_len))
 			goto fail;
+		RTE_LOG(INFO, EAL, "(yasufum) fd resize_and_map is OK\n");
 
 		/* we've mmap'ed the file, we can now close the fd */
 		close(fd);
